@@ -350,6 +350,7 @@ def to_agent_engine(
     absolutize_imports: bool = True,
     project: Optional[str] = None,
     region: Optional[str] = None,
+    service_account: Optional[str] = None,
     display_name: Optional[str] = None,
     description: Optional[str] = None,
     requirements_file: Optional[str] = None,
@@ -395,6 +396,7 @@ def to_agent_engine(
       import statements.
     project (str): Optional. Google Cloud project id.
     region (str): Optional. Google Cloud region.
+    service_account (str): Optional. Google Cloud service account
     display_name (str): Optional. The display name of the Agent Engine.
     description (str): Optional. The description of the Agent Engine.
     requirements_file (str): Optional. The filepath to the `requirements.txt`
@@ -518,6 +520,19 @@ def to_agent_engine(
           else:
             region = env_region
             click.echo(f'{region=} set by GOOGLE_CLOUD_LOCATION in {env_file}')
+      if 'GOOGLE_CLOUD_SERVICE_ACCOUNT' in env_vars:
+        env_sa = env_vars.pop('GOOGLE_CLOUD_SERVICE_ACCOUNT')
+        if env_sa:
+          if service_account:
+            click.secho(
+                'Ignoring GOOGLE_CLOUD_SERVICE_ACCOUNT as `--service_account`'
+                ' was explicitly passed and takes precedence',
+                fg='yellow',
+            )
+          else:
+            service_account = env_sa
+            click.echo(f"""{service_account=} set by
+                       GOOGLE_CLOUD_SERVICE_ACCOUNT in {env_file}""")
     if env_vars:
       if 'env_vars' in agent_config:
         click.echo(
@@ -526,6 +541,9 @@ def to_agent_engine(
       agent_config['env_vars'] = env_vars
     # Set env_vars in agent_config to None if it is not set.
     agent_config['env_vars'] = agent_config.get('env_vars', env_vars)
+    # set service account if specified
+    if service_account:
+      agent_config['service_account'] = service_account
 
     vertexai.init(
         project=project,

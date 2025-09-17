@@ -1112,6 +1112,16 @@ def cli_deploy_cloud_run(
     ),
 )
 @click.option(
+    "--service_account",
+    type=str,
+    help=(
+        "Optional. Google Cloud service account to be used by the agent."
+        "It will override GOOGLE_CLOUD_SERVICE_ACCOUNT in the .env file "
+        "(if it exists). If not provided, "
+        "the AI Platform Reasoning Engine Service Agent will be used."
+    ),
+)
+@click.option(
     "--staging_bucket",
     type=str,
     help="Required. GCS bucket for staging the deployment artifacts.",
