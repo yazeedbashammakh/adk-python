@@ -83,6 +83,31 @@ adk_app = AdkApp(
 """
 
 
+def _resolve_param_from_env(
+    param_value: Optional[str],
+    env_var_name: str,
+    param_name: str,
+    env_vars: dict[str, str],
+    env_file: str,
+) -> Optional[str]:
+    """Resolves a parameter from environment variables, with CLI precedence."""
+    if env_var_name in env_vars:
+        env_value = env_vars.pop(env_var_name)
+        if env_value:
+            if param_value:
+                click.secho(
+                    f'Ignoring {env_var_name} in {env_file} as `--{param_name}` '
+                    'was explicitly passed and takes precedence.',
+                    fg='yellow',
+                )
+            else:
+                param_value = env_value
+                click.echo(
+                    f'{param_name}={param_value} set by {env_var_name} in {env_file}'
+                )
+    return param_value
+
+
 def _resolve_project(project_in_option: Optional[str]) -> str:
   if project_in_option:
     return project_in_option
@@ -396,7 +421,10 @@ def to_agent_engine(
       import statements.
     project (str): Optional. Google Cloud project id.
     region (str): Optional. Google Cloud region.
-    service_account (str): Optional. Google Cloud service account
+    service_account (str): Optional. Google Cloud service account to be used 
+      by the agent. It will override GOOGLE_CLOUD_SERVICE_ACCOUNT in the .env 
+      file (if it exists). If not provided, the AI Platform Reasoning Engine 
+      Service Agent will be used.
     display_name (str): Optional. The display name of the Agent Engine.
     description (str): Optional. The description of the Agent Engine.
     requirements_file (str): Optional. The filepath to the `requirements.txt`
@@ -496,43 +524,30 @@ def to_agent_engine(
 
       click.echo(f'Reading environment variables from {env_file}')
       env_vars = dotenv_values(env_file)
-      if 'GOOGLE_CLOUD_PROJECT' in env_vars:
-        env_project = env_vars.pop('GOOGLE_CLOUD_PROJECT')
-        if env_project:
-          if project:
-            click.secho(
-                'Ignoring GOOGLE_CLOUD_PROJECT in .env as `--project` was'
-                ' explicitly passed and takes precedence',
-                fg='yellow',
-            )
-          else:
-            project = env_project
-            click.echo(f'{project=} set by GOOGLE_CLOUD_PROJECT in {env_file}')
-      if 'GOOGLE_CLOUD_LOCATION' in env_vars:
-        env_region = env_vars.pop('GOOGLE_CLOUD_LOCATION')
-        if env_region:
-          if region:
-            click.secho(
-                'Ignoring GOOGLE_CLOUD_LOCATION in .env as `--region` was'
-                ' explicitly passed and takes precedence',
-                fg='yellow',
-            )
-          else:
-            region = env_region
-            click.echo(f'{region=} set by GOOGLE_CLOUD_LOCATION in {env_file}')
-      if 'GOOGLE_CLOUD_SERVICE_ACCOUNT' in env_vars:
-        env_sa = env_vars.pop('GOOGLE_CLOUD_SERVICE_ACCOUNT')
-        if env_sa:
-          if service_account:
-            click.secho(
-                'Ignoring GOOGLE_CLOUD_SERVICE_ACCOUNT as `--service_account`'
-                ' was explicitly passed and takes precedence',
-                fg='yellow',
-            )
-          else:
-            service_account = env_sa
-            click.echo(f"""{service_account=} set by
-                       GOOGLE_CLOUD_SERVICE_ACCOUNT in {env_file}""")
+      project = _resolve_param_from_env(
+        param_value=project,
+        env_var_name='GOOGLE_CLOUD_PROJECT',
+        param_name='project',
+        env_vars=env_vars,
+        env_file=env_file
+      )
+
+      region = _resolve_param_from_env(
+        param_value=region,
+        env_var_name='GOOGLE_CLOUD_LOCATION',
+        param_name='region',
+        env_vars=env_vars,
+        env_file=env_file
+      )
+
+      service_account = _resolve_param_from_env(
+        param_value=service_account,
+        env_var_name='GOOGLE_CLOUD_SERVICE_ACCOUNT',
+        param_name='service_account',
+        env_vars=env_vars,
+        env_file=env_file
+      )
+
     if env_vars:
       if 'env_vars' in agent_config:
         click.echo(
